@@ -23,6 +23,7 @@ class DPM_Recovery:
         self.nearest_points = []
         self.lines = []
         self.intersections = []
+        self.max_values = []
 
     def binarization(self):
         # search for matches
@@ -121,6 +122,31 @@ class DPM_Recovery:
                                 self.nearest_points.append([n_cl + 1, i + 1, point])
                 # cv.drawContours(img3, [box], 0, (255, 0, 255), 2)
 
+    def agg_max_values(self):
+        maximum_value = None
+        for i, item in enumerate(self.intersections):
+            if i == 0:
+                maximum_value = item
+            if i + 1 == len(self.intersections):
+                self.max_values.append(maximum_value)
+                continue
+            if self.intersections[i][0] == self.intersections[i + 1][0] and self.intersections[i][1] == \
+                    self.intersections[i + 1][1]:
+                # temp1 = item[3]
+                # temp2 = self.intersections[i+1][3]
+                if maximum_value[3] <= self.intersections[i + 1][3]:
+                    maximum_value = self.intersections[i + 1]
+                else:
+                    continue
+            else:
+                self.max_values.append(maximum_value)
+                maximum_value = self.intersections[i + 1]
+
+    def draw_lines(self):
+        lines = ([i[2] for i in self.max_values])
+        for line in lines:
+            cv.line(self.groups_points, tuple(line[0]), tuple(line[1]), (255, 255, 0), 1)
+
     def defining_code_boundaries(self):
         count_intersection = 0
         self.find_nearest_points()
@@ -130,6 +156,7 @@ class DPM_Recovery:
                 if condition != 0 and p[1] == j[1] and p[0] == j[0]:
                     line = (p[2], j[2])
                     self.lines.append([p[0], p[1], line])
+
         for line in self.lines:
             count_intersection = 0
             for point in self.nearest_points:
@@ -139,6 +166,8 @@ class DPM_Recovery:
                     if point_intersection is not None:
                         count_intersection += 1
             self.intersections.append([line[0], line[1], line[2], count_intersection])
+        self.agg_max_values()
+        self.draw_lines()
 
     def visualization(self):
         titles = ['Original', 'Binarization', 'Detected groups']
