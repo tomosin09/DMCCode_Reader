@@ -112,7 +112,7 @@ class DPM_Recovery:
                     for c in cluster:
                         if i == 3:
                             dist = self.det_dist_to_points(box[i], box[0], c)
-                            point = self.get_min_dist(dist, c, 15)
+                            point = self.get_min_dist(dist, c, 25)
                             if point is not None:
                                 self.nearest_points.append([n_cl + 1, i + 1, point])
                         else:
@@ -143,9 +143,41 @@ class DPM_Recovery:
                 maximum_value = self.intersections[i + 1]
 
     def draw_lines(self):
-        lines = ([i[2] for i in self.max_values])
-        for line in lines:
-            cv.line(self.groups_points, tuple(line[0]), tuple(line[1]), (255, 255, 0), 1)
+        coords = []
+        lines = ([i for i in self.max_values])
+        for i, line in enumerate(lines):
+            # Composing two columns of coordinates
+            x_coords, y_coords = zip(*line[2])
+            # Stack arrays in sequence vertically
+            A = np.vstack([x_coords, np.ones(len(x_coords))]).T
+            # Line Solution
+            k, m = lstsq(A, y_coords)[0]
+            lines[i].append([k, m])
+        check = True
+        for i, line in enumerate(lines):
+            if check:
+                first_line = line
+                check = False
+            if i + 1 == len(lines):
+                x = int((first_line[4][1] - line[4][1]) / (line[4][0] - first_line[4][0]))
+                y = int(line[4][0] * x + line[4][1])
+                coords.append([x, y])
+                continue
+            if line[0] == lines[i + 1][0] and line != lines[i + 1]:
+                x = int((lines[i + 1][4][1] - line[4][1]) / (line[4][0] - lines[i + 1][4][0]))
+                y = int(line[4][0] * x + line[4][1])
+                coords.append([x, y])
+            else:
+                x = int((first_line[4][1] - line[4][1]) / (line[4][0] - first_line[4][0]))
+                y = int(line[4][0] * x + line[4][1])
+                coords.append([x, y])
+                check = True
+        coords = np.array((coords)).reshape((2, 8))
+        for c in coords:
+            coord = c.reshape(4,2)
+            cv.drawContours(self.groups_points, [coord], 0, (0, 255, 0), 2)
+
+        # cv.drawContours(img3, [box], 0, (255, 0, 255), 2)
 
     def defining_code_boundaries(self):
         count_intersection = 0
@@ -156,13 +188,12 @@ class DPM_Recovery:
                 if condition != 0 and p[1] == j[1] and p[0] == j[0]:
                     line = (p[2], j[2])
                     self.lines.append([p[0], p[1], line])
-
         for line in self.lines:
             count_intersection = 0
             for point in self.nearest_points:
                 if line[0] == point[0] and line[1] == point[1]:
                     dist = self.det_dist_to_points(line[2][0], line[2][1], point[2])
-                    point_intersection = self.get_min_dist(dist, point[2], 5)
+                    point_intersection = self.get_min_dist(dist, point[2], 3)
                     if point_intersection is not None:
                         count_intersection += 1
             self.intersections.append([line[0], line[1], line[2], count_intersection])
